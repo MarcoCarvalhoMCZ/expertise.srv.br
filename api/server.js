@@ -29,6 +29,11 @@ app.use('/api/posts', postRoutes);
 // Painel admin (SPA servida como estático)
 app.use('/admin', express.static(path.join(__dirname, '..', 'admin')));
 
+// Página individual de post
+app.get('/post/:slug', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'post.html'));
+});
+
 // Site principal — servir arquivos estáticos da raiz
 app.use(express.static(path.join(__dirname, '..')));
 
