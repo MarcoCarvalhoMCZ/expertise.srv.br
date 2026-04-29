@@ -225,10 +225,26 @@
           </div>
           <span id="filterCount" style="color:#64748b;font-size:0.85rem;white-space:nowrap;"></span>
         </div>
-        <div class="table-wrap">
+        <!-- Controles de visualização e paginação -->
+        <div style="display:flex;gap:12px;margin-bottom:12px;align-items:center;flex-wrap:wrap;">
+          <div style="display:flex;gap:4px;background:#e2e8f0;border-radius:8px;padding:3px;">
+            <button id="viewModeTable" class="btn btn-sm" style="background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.1);" onclick="setViewMode('table')">📋 Lista</button>
+            <button id="viewModeCards" class="btn btn-sm" style="background:transparent;color:#64748b;" onclick="setViewMode('cards')">🖼️ Cards</button>
+          </div>
+          <select id="pageSize" onchange="applyFilters()" style="padding:6px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-family:inherit;font-size:0.85rem;background:#fff;">
+            <option value="5">5 por página</option>
+            <option value="10" selected>10 por página</option>
+            <option value="20">20 por página</option>
+            <option value="50">50 por página</option>
+            <option value="9999">Todos</option>
+          </select>
+        </div>
+        <!-- Visualização em Tabela -->
+        <div class="table-wrap" id="viewTableWrap">
           <table>
             <thead>
               <tr>
+                <th style="width:40px;"></th>
                 <th>Título</th>
                 <th>Tipo</th>
                 <th>Status</th>
@@ -237,10 +253,14 @@
               </tr>
             </thead>
             <tbody id="postsTableBody">
-              <tr><td colspan="5" style="text-align:center;padding:24px;color:#94a3b8;">Carregando posts...</td></tr>
+              <tr><td colspan="6" style="text-align:center;padding:24px;color:#94a3b8;">Carregando posts...</td></tr>
             </tbody>
           </table>
         </div>
+        <!-- Visualização em Cards -->
+        <div class="cards blog-grid" id="viewCardsGrid" style="display:none;"></div>
+        <!-- Paginação -->
+        <div id="pagination" style="display:flex;justify-content:center;align-items:center;gap:8px;margin-top:20px;flex-wrap:wrap;"></div>
       </div>
 
       <!-- View: Novo/Editar Post -->
@@ -504,9 +524,9 @@
           document.getElementById('formTitle').textContent = 'Editar Post';
         }
 
-        document.getElementById('formSuccess').textContent = data.message;
-        document.getElementById('formSuccess').style.display = 'block';
-        document.getElementById('formError').style.display = 'none';
+        showToast(data.message, 'success');
+        // Navegar para a lista de posts mantendo os filtros
+        showPostsList();
         loadPosts();
       } catch (err) {
         document.getElementById('formError').textContent = err.message;
@@ -676,10 +696,12 @@
 
     // ==================== Filtros Inteligentes ====================
     let allPosts = [];
+    let currentPage = 1;
+    let viewMode = 'table';
 
     async function loadPosts() {
       const tbody = document.getElementById('postsTableBody');
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;">Carregando...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;">Carregando...</td></tr>';
       try {
         const res = await fetch(API + '/posts', {
           headers: token ? { 'Authorization': 'Bearer ' + token } : {},
@@ -689,42 +711,44 @@
         if (!res.ok) throw new Error(data.error);
 
         allPosts = data.posts || [];
+        currentPage = 1;
         renderFilteredPosts();
       } catch (err) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:#ef4444;">Erro ao carregar posts.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:#ef4444;">Erro ao carregar posts.</td></tr>';
         console.error(err);
       }
     }
 
     function applyFilters() {
+      currentPage = 1;
       renderFilteredPosts();
     }
 
-    function renderFilteredPosts() {
-      const tbody = document.getElementById('postsTableBody');
+    function setViewMode(mode) {
+      viewMode = mode;
+      const btnTable = document.getElementById('viewModeTable');
+      const btnCards = document.getElementById('viewModeCards');
+      if (mode === 'table') {
+        btnTable.style.cssText = 'background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.1);';
+        btnCards.style.cssText = 'background:transparent;color:#64748b;';
+      } else {
+        btnCards.style.cssText = 'background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.1);';
+        btnTable.style.cssText = 'background:transparent;color:#64748b;';
+      }
+      renderFilteredPosts();
+    }
+
+    function getFilteredPosts() {
       const searchTerm = (document.getElementById('filterSearch')?.value || '').toLowerCase();
       const typeFilter = document.getElementById('filterType')?.value || '';
       const statusFilter = document.getElementById('filterStatus')?.value;
+      let filtered = [...allPosts];
 
-      let filtered = allPosts;
-
-      // Filtro por texto (título)
-      if (searchTerm) {
-        filtered = filtered.filter(p => p.title.toLowerCase().includes(searchTerm));
-      }
-
-      // Filtro por tipo
-      if (typeFilter) {
-        filtered = filtered.filter(p => p.post_type === typeFilter);
-      }
-
-      // Filtro por status (published)
+      if (searchTerm) filtered = filtered.filter(p => p.title.toLowerCase().includes(searchTerm));
+      if (typeFilter) filtered = filtered.filter(p => p.post_type === typeFilter);
       if (statusFilter !== '') {
-        const isPublished = statusFilter === '1';
-        filtered = filtered.filter(p => p.published === isPublished);
+        filtered = filtered.filter(p => p.published === (statusFilter === '1'));
       }
-
-      // Filtro por período (data)
       const dateStart = document.getElementById('filterDateStart')?.value;
       const dateEnd = document.getElementById('filterDateEnd')?.value;
       if (dateStart) {
@@ -735,30 +759,116 @@
         const end = new Date(dateEnd + 'T23:59:59');
         filtered = filtered.filter(p => new Date(p.created_at) <= end);
       }
+      return filtered;
+    }
 
-      // Atualizar contador
+    function getThumbnail(post) {
+      if (post.thumbnail_url) return post.thumbnail_url;
+      if (post.media && post.media.length > 0) return post.media[0].file_url;
+      return null;
+    }
+
+    function renderFilteredPosts() {
+      const filtered = getFilteredPosts();
       const countEl = document.getElementById('filterCount');
+      const pageSize = parseInt(document.getElementById('pageSize')?.value || '10', 10);
+      const totalPages = Math.ceil(filtered.length / pageSize);
+      if (currentPage > totalPages) currentPage = totalPages || 1;
+      const startIdx = (currentPage - 1) * pageSize;
+      const pageItems = (pageSize >= 9999) ? filtered : filtered.slice(startIdx, startIdx + pageSize);
+
       if (countEl) {
         countEl.textContent = `${filtered.length} post(s) encontrado(s)`;
       }
 
-      if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:#94a3b8;">Nenhum post encontrado com os filtros aplicados.</td></tr>';
-        return;
+      const typeLabel = { text: 'Texto', image: 'Imagem', video: 'Vídeo', audio: 'Áudio', mixed: 'Misto' };
+
+      // Renderizar tabela
+      const tbody = document.getElementById('postsTableBody');
+      const tableWrap = document.getElementById('viewTableWrap');
+      const cardsGrid = document.getElementById('viewCardsGrid');
+
+      if (viewMode === 'table') {
+        tableWrap.style.display = '';
+        cardsGrid.style.display = 'none';
+        if (pageItems.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:#94a3b8;">Nenhum post encontrado com os filtros aplicados.</td></tr>';
+        } else {
+          tbody.innerHTML = pageItems.map(p => {
+            const thumb = getThumbnail(p);
+            const thumbHtml = thumb ? `<img src="${thumb}" style="width:44px;height:44px;object-fit:cover;border-radius:6px;" />` : `<div style="width:44px;height:44px;border-radius:6px;background:#e2e8f0;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:1.2rem;">${p.post_type === 'video' ? '🎬' : p.post_type === 'audio' ? '🎙️' : '📄'}</div>`;
+            return `<tr>
+              <td>${thumbHtml}</td>
+              <td><strong>${escapeHtml(p.title)}</strong><br><small style="color:#94a3b8;">${p.slug}</small></td>
+              <td><span class="badge badge-${p.post_type}">${typeLabel[p.post_type] || p.post_type}</span></td>
+              <td><span class="badge ${p.published ? 'badge-published' : 'badge-draft'}">${p.published ? 'Publicado' : 'Rascunho'}</span></td>
+              <td>${formatDate(p.created_at)}</td>
+              <td class="actions">
+                <button class="btn btn-secondary btn-sm" onclick="editPost(${p.id})">Editar</button>
+                <button class="btn btn-danger btn-sm" onclick="deletePost(${p.id})">Excluir</button>
+              </td>
+            </tr>`;
+          }).join('');
+        }
+      } else {
+        // Modo cards
+        tableWrap.style.display = 'none';
+        cardsGrid.style.display = 'grid';
+        if (pageItems.length === 0) {
+          cardsGrid.innerHTML = '<div style="text-align:center;padding:48px;color:#94a3b8;grid-column:1/-1;">Nenhum post encontrado com os filtros aplicados.</div>';
+        } else {
+          cardsGrid.innerHTML = pageItems.map(p => {
+            const thumb = getThumbnail(p);
+            const thumbHtml = thumb
+              ? `<div class="blog-thumb" style="height:140px;"><img src="${thumb}" alt="${escapeHtml(p.title)}" style="width:100%;height:100%;object-fit:cover;" /></div>`
+              : `<div style="height:100px;display:flex;align-items:center;justify-content:center;background:#e2e8f0;border-radius:18px;font-size:2rem;">${p.post_type === 'video' ? '🎬' : p.post_type === 'audio' ? '🎙️' : '📄'}</div>`;
+            const excerpt = p.excerpt || stripHtml(p.content || '').substring(0, 80) + '...';
+            return `<article class="card blog-card" style="cursor:pointer;" onclick="editPost(${p.id})">
+              ${thumbHtml}
+              <span class="icon" style="font-size:1.2rem;">${p.post_type === 'video' ? '🎬' : p.post_type === 'audio' ? '🎙️' : p.post_type === 'image' ? '🖼️' : '📄'}</span>
+              <h3 style="font-size:1rem;">${escapeHtml(p.title)}</h3>
+              <p style="font-size:0.8rem;">${escapeHtml(excerpt)}</p>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+                <span class="badge ${p.published ? 'badge-published' : 'badge-draft'}">${p.published ? 'Publicado' : 'Rascunho'}</span>
+                <small style="color:#94a3b8;">${formatDate(p.created_at)}</small>
+              </div>
+              <div class="actions" style="margin-top:8px;">
+                <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();editPost(${p.id})">Editar</button>
+                <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deletePost(${p.id})">Excluir</button>
+              </div>
+            </article>`;
+          }).join('');
+        }
       }
 
-      const typeLabel = { text: 'Texto', image: 'Imagem', video: 'Vídeo', audio: 'Áudio', mixed: 'Misto' };
-      tbody.innerHTML = filtered.map(p => `
-        <tr>
-          <td><strong>${escapeHtml(p.title)}</strong><br><small style="color:#94a3b8;">${p.slug}</small></td>
-          <td><span class="badge badge-${p.post_type}">${typeLabel[p.post_type] || p.post_type}</span></td>
-          <td><span class="badge ${p.published ? 'badge-published' : 'badge-draft'}">${p.published ? 'Publicado' : 'Rascunho'}</span></td>
-          <td>${formatDate(p.created_at)}</td>
-          <td class="actions">
-            <button class="btn btn-secondary btn-sm" onclick="editPost(${p.id})">Editar</button>
-            <button class="btn btn-danger btn-sm" onclick="deletePost(${p.id})">Excluir</button>
-          </td>
-        </tr>`).join('');
+      // Renderizar paginação
+      renderPagination(currentPage, totalPages);
+    }
+
+    function renderPagination(page, total) {
+      const pag = document.getElementById('pagination');
+      if (total <= 1) { pag.innerHTML = ''; return; }
+      let html = '';
+      html += `<button class="btn btn-sm btn-secondary" onclick="goToPage(${page - 1})" ${page <= 1 ? 'disabled' : ''}>‹ Anterior</button>`;
+      for (let i = 1; i <= total; i++) {
+        if (total > 7 && i > 3 && i < total - 2 && i !== page && i !== page - 1 && i !== page + 1) {
+          if (i === 4) html += '<span style="padding:0 4px;">…</span>';
+          continue;
+        }
+        html += `<button class="btn btn-sm ${i === page ? 'btn-primary' : 'btn-secondary'}" onclick="goToPage(${i})" ${i === page ? 'disabled' : ''}>${i}</button>`;
+      }
+      html += `<button class="btn btn-sm btn-secondary" onclick="goToPage(${page + 1})" ${page >= total ? 'disabled' : ''}>Próximo ›</button>`;
+      pag.innerHTML = html;
+    }
+
+    function goToPage(p) {
+      const filtered = getFilteredPosts();
+      const pageSize = parseInt(document.getElementById('pageSize')?.value || '10', 10);
+      const totalPages = Math.ceil(filtered.length / pageSize);
+      if (p < 1 || p > totalPages) return;
+      currentPage = p;
+      renderFilteredPosts();
+      document.querySelector('#view-posts').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
     // ==================== Helpers ====================
