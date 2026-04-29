@@ -200,6 +200,26 @@
           <h1>Blog Posts</h1>
           <button class="btn btn-primary" onclick="showNewPost()">➕ Novo Post</button>
         </div>
+        <!-- Filtros inteligentes -->
+        <div class="filter-bar" style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+          <div style="flex:1;min-width:200px;">
+            <input type="text" id="filterSearch" placeholder="🔍 Buscar por título..." style="width:100%;padding:9px 14px;border:1.5px solid #e2e8f0;border-radius:8px;font-family:inherit;font-size:0.9rem;" oninput="applyFilters()" />
+          </div>
+          <select id="filterType" onchange="applyFilters()" style="padding:9px 14px;border:1.5px solid #e2e8f0;border-radius:8px;font-family:inherit;font-size:0.9rem;background:#fff;">
+            <option value="">Todos os tipos</option>
+            <option value="text">📄 Texto</option>
+            <option value="image">🖼️ Imagem</option>
+            <option value="video">🎬 Vídeo</option>
+            <option value="audio">🎙️ Áudio</option>
+            <option value="mixed">📰 Misto</option>
+          </select>
+          <select id="filterStatus" onchange="applyFilters()" style="padding:9px 14px;border:1.5px solid #e2e8f0;border-radius:8px;font-family:inherit;font-size:0.9rem;background:#fff;">
+            <option value="">Todos os status</option>
+            <option value="1">✅ Publicados</option>
+            <option value="0">📝 Rascunhos</option>
+          </select>
+          <span id="filterCount" style="color:#64748b;font-size:0.85rem;white-space:nowrap;"></span>
+        </div>
         <div class="table-wrap">
           <table>
             <thead>
@@ -357,12 +377,19 @@
     }
 
     // ==================== Navigation ====================
+    function hideAllViews() {
+      document.getElementById('view-posts').style.display = 'none';
+      document.getElementById('view-new-post').style.display = 'none';
+      document.getElementById('view-password').style.display = 'none';
+    }
+
     document.querySelectorAll('.sidebar-nav a').forEach(link => {
       link.addEventListener('click', (e) => {
         e.preventDefault();
         document.querySelectorAll('.sidebar-nav a').forEach(l => l.classList.remove('active'));
         link.classList.add('active');
         const view = link.dataset.view;
+        hideAllViews();
         if (view === 'posts') { showPostsList(); loadPosts(); }
         if (view === 'new-post') showNewPost();
         if (view === 'password') showPasswordView();
@@ -370,16 +397,14 @@
     });
 
     function showPostsList() {
+      hideAllViews();
       document.getElementById('view-posts').style.display = 'block';
-      document.getElementById('view-new-post').style.display = 'none';
       document.querySelector('.sidebar-nav a[data-view="posts"]').classList.add('active');
-      document.querySelector('.sidebar-nav a[data-view="new-post"]').classList.remove('active');
     }
 
     function showNewPost(postId = null) {
-      document.getElementById('view-posts').style.display = 'none';
+      hideAllViews();
       document.getElementById('view-new-post').style.display = 'block';
-      document.querySelector('.sidebar-nav a[data-view="posts"]').classList.remove('active');
       document.querySelector('.sidebar-nav a[data-view="new-post"]').classList.add('active');
       document.getElementById('formSuccess').style.display = 'none';
       document.getElementById('formError').style.display = 'none';
@@ -407,41 +432,6 @@
     }
 
     // ==================== Posts CRUD ====================
-    async function loadPosts() {
-      const tbody = document.getElementById('postsTableBody');
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;">Carregando...</td></tr>';
-      try {
-        const res = await fetch(API + '/posts', {
-          headers: token ? { 'Authorization': 'Bearer ' + token } : {},
-          credentials: 'include'
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error);
-
-        if (!data.posts || data.posts.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:#94a3b8;">Nenhum post encontrado.</td></tr>';
-          return;
-        }
-        tbody.innerHTML = data.posts.map(p => {
-          const typeLabel = { text: 'Texto', image: 'Imagem', video: 'Vídeo', audio: 'Áudio', mixed: 'Misto' };
-          return `
-            <tr>
-              <td><strong>${escapeHtml(p.title)}</strong><br><small style="color:#94a3b8;">${p.slug}</small></td>
-              <td><span class="badge badge-${p.post_type}">${typeLabel[p.post_type] || p.post_type}</span></td>
-              <td><span class="badge ${p.published ? 'badge-published' : 'badge-draft'}">${p.published ? 'Publicado' : 'Rascunho'}</span></td>
-              <td>${formatDate(p.created_at)}</td>
-              <td class="actions">
-                <button class="btn btn-secondary btn-sm" onclick="editPost(${p.id})">Editar</button>
-                <button class="btn btn-danger btn-sm" onclick="deletePost(${p.id})">Excluir</button>
-              </td>
-            </tr>`;
-        }).join('');
-      } catch (err) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:#ef4444;">Erro ao carregar posts.</td></tr>';
-        console.error(err);
-      }
-    }
-
     async function loadPostForEdit(id) {
       try {
         // Buscar todos (incluindo não publicados) para edição
@@ -669,14 +659,89 @@
     });
 
     function showPasswordView() {
-      document.getElementById('view-posts').style.display = 'none';
-      document.getElementById('view-new-post').style.display = 'none';
+      hideAllViews();
       document.getElementById('view-password').style.display = 'block';
+      document.querySelector('.sidebar-nav a[data-view="password"]').classList.add('active');
       document.getElementById('passwordSuccess').style.display = 'none';
       document.getElementById('passwordError').style.display = 'none';
       document.getElementById('currentPassword').value = '';
       document.getElementById('newPassword').value = '';
       document.getElementById('confirmNewPassword').value = '';
+    }
+
+    // ==================== Filtros Inteligentes ====================
+    let allPosts = [];
+
+    async function loadPosts() {
+      const tbody = document.getElementById('postsTableBody');
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;">Carregando...</td></tr>';
+      try {
+        const res = await fetch(API + '/posts', {
+          headers: token ? { 'Authorization': 'Bearer ' + token } : {},
+          credentials: 'include'
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+
+        allPosts = data.posts || [];
+        renderFilteredPosts();
+      } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:#ef4444;">Erro ao carregar posts.</td></tr>';
+        console.error(err);
+      }
+    }
+
+    function applyFilters() {
+      renderFilteredPosts();
+    }
+
+    function renderFilteredPosts() {
+      const tbody = document.getElementById('postsTableBody');
+      const searchTerm = (document.getElementById('filterSearch')?.value || '').toLowerCase();
+      const typeFilter = document.getElementById('filterType')?.value || '';
+      const statusFilter = document.getElementById('filterStatus')?.value;
+
+      let filtered = allPosts;
+
+      // Filtro por texto (título)
+      if (searchTerm) {
+        filtered = filtered.filter(p => p.title.toLowerCase().includes(searchTerm));
+      }
+
+      // Filtro por tipo
+      if (typeFilter) {
+        filtered = filtered.filter(p => p.post_type === typeFilter);
+      }
+
+      // Filtro por status (published)
+      if (statusFilter !== '') {
+        const isPublished = statusFilter === '1';
+        filtered = filtered.filter(p => p.published === isPublished);
+      }
+
+      // Atualizar contador
+      const countEl = document.getElementById('filterCount');
+      if (countEl) {
+        countEl.textContent = `${filtered.length} post(s) encontrado(s)`;
+      }
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:#94a3b8;">Nenhum post encontrado com os filtros aplicados.</td></tr>';
+        return;
+      }
+
+      const typeLabel = { text: 'Texto', image: 'Imagem', video: 'Vídeo', audio: 'Áudio', mixed: 'Misto' };
+      tbody.innerHTML = filtered.map(p => `
+        <tr>
+          <td><strong>${escapeHtml(p.title)}</strong><br><small style="color:#94a3b8;">${p.slug}</small></td>
+          <td><span class="badge badge-${p.post_type}">${typeLabel[p.post_type] || p.post_type}</span></td>
+          <td><span class="badge ${p.published ? 'badge-published' : 'badge-draft'}">${p.published ? 'Publicado' : 'Rascunho'}</span></td>
+          <td>${formatDate(p.created_at)}</td>
+          <td class="actions">
+            <button class="btn btn-secondary btn-sm" onclick="editPost(${p.id})">Editar</button>
+            <button class="btn btn-danger btn-sm" onclick="deletePost(${p.id})">Excluir</button>
+          </td>
+        </tr>`).join('');
     }
 
     // ==================== Helpers ====================
