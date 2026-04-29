@@ -75,6 +75,45 @@ router.get('/me', authenticateToken, async (req, res) => {
   }
 });
 
+// PUT /api/auth/password — alterar senha (admin autenticado)
+router.put('/password', authenticateToken, async (req, res) => {
+  try {
+    const { current_password, new_password } = req.body;
+    if (!current_password || !new_password) {
+      return res.status(400).json({ error: 'Senha atual e nova senha são obrigatórias.' });
+    }
+    if (new_password.length < 6) {
+      return res.status(400).json({ error: 'A nova senha deve ter pelo menos 6 caracteres.' });
+    }
+
+    // Verificar senha atual
+    const result = await query(
+      'SELECT password_hash FROM users WHERE id = $1',
+      [req.user.id]
+    );
+    if (result.recordset.length === 0) {
+      return res.status(404).json({ error: 'Usuário não encontrado.' });
+    }
+
+    const valid = await bcrypt.compare(current_password, result.recordset[0].password_hash);
+    if (!valid) {
+      return res.status(401).json({ error: 'Senha atual incorreta.' });
+    }
+
+    // Atualizar senha
+    const hash = await bcrypt.hash(new_password, 10);
+    await query(
+      'UPDATE users SET password_hash = $1, updated_at = GETDATE() WHERE id = $2',
+      [hash, req.user.id]
+    );
+
+    res.json({ message: 'Senha alterada com sucesso.' });
+  } catch (err) {
+    console.error('Erro ao alterar senha:', err);
+    res.status(500).json({ error: 'Erro interno no servidor.' });
+  }
+});
+
 // POST /api/auth/logout
 router.post('/logout', (req, res) => {
   res.clearCookie('token');

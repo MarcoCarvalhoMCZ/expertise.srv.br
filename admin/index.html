@@ -185,6 +185,7 @@
       <nav class="sidebar-nav">
         <a href="#" class="active" data-view="posts">📝 Posts</a>
         <a href="#" data-view="new-post">➕ Novo Post</a>
+        <a href="#" data-view="password">🔒 Alterar Senha</a>
       </nav>
       <div class="sidebar-footer">
         <div class="user-info" id="userInfo">Carregando...</div>
@@ -275,6 +276,29 @@
           </div>
         </div>
       </div>
+      <!-- View: Alterar Senha -->
+      <div id="view-password" style="display:none;">
+        <div class="page-header">
+          <h1>Alterar Senha</h1>
+        </div>
+        <div class="success-msg" id="passwordSuccess"></div>
+        <div class="error-msg" id="passwordError"></div>
+        <form id="passwordForm" style="max-width:480px;">
+          <div class="form-group">
+            <label for="currentPassword">Senha atual</label>
+            <input type="password" id="currentPassword" required autocomplete="current-password" />
+          </div>
+          <div class="form-group">
+            <label for="newPassword">Nova senha</label>
+            <input type="password" id="newPassword" required autocomplete="new-password" minlength="6" />
+          </div>
+          <div class="form-group">
+            <label for="confirmNewPassword">Confirmar nova senha</label>
+            <input type="password" id="confirmNewPassword" required autocomplete="new-password" minlength="6" />
+          </div>
+          <button type="submit" class="btn btn-primary">Alterar Senha</button>
+        </form>
+      </div>
     </main>
   </div>
 
@@ -341,6 +365,7 @@
         const view = link.dataset.view;
         if (view === 'posts') { showPostsList(); loadPosts(); }
         if (view === 'new-post') showNewPost();
+        if (view === 'password') showPasswordView();
       });
     });
 
@@ -596,6 +621,62 @@
       } catch (err) {
         showToast(err.message, 'error');
       }
+    }
+
+    // ==================== Password ====================
+    document.getElementById('passwordForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const currentPassword = document.getElementById('currentPassword').value;
+      const newPassword = document.getElementById('newPassword').value;
+      const confirmNewPassword = document.getElementById('confirmNewPassword').value;
+      const errorEl = document.getElementById('passwordError');
+      const successEl = document.getElementById('passwordSuccess');
+
+      errorEl.style.display = 'none';
+      successEl.style.display = 'none';
+
+      if (newPassword !== confirmNewPassword) {
+        errorEl.textContent = 'A nova senha e a confirmação não conferem.';
+        errorEl.style.display = 'block';
+        return;
+      }
+
+      if (newPassword.length < 6) {
+        errorEl.textContent = 'A nova senha deve ter pelo menos 6 caracteres.';
+        errorEl.style.display = 'block';
+        return;
+      }
+
+      try {
+        const res = await fetch(API + '/auth/password', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+          credentials: 'include'
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Erro ao alterar senha.');
+
+        successEl.textContent = data.message;
+        successEl.style.display = 'block';
+        document.getElementById('currentPassword').value = '';
+        document.getElementById('newPassword').value = '';
+        document.getElementById('confirmNewPassword').value = '';
+      } catch (err) {
+        errorEl.textContent = err.message;
+        errorEl.style.display = 'block';
+      }
+    });
+
+    function showPasswordView() {
+      document.getElementById('view-posts').style.display = 'none';
+      document.getElementById('view-new-post').style.display = 'none';
+      document.getElementById('view-password').style.display = 'block';
+      document.getElementById('passwordSuccess').style.display = 'none';
+      document.getElementById('passwordError').style.display = 'none';
+      document.getElementById('currentPassword').value = '';
+      document.getElementById('newPassword').value = '';
+      document.getElementById('confirmNewPassword').value = '';
     }
 
     // ==================== Helpers ====================
