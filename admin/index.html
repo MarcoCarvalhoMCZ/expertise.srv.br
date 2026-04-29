@@ -218,6 +218,11 @@
             <option value="1">✅ Publicados</option>
             <option value="0">📝 Rascunhos</option>
           </select>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input type="date" id="filterDateStart" onchange="applyFilters()" style="padding:8px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-family:inherit;font-size:0.85rem;background:#fff;" title="Data inicial" />
+            <span style="color:#94a3b8;">até</span>
+            <input type="date" id="filterDateEnd" onchange="applyFilters()" style="padding:8px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-family:inherit;font-size:0.85rem;background:#fff;" title="Data final" />
+          </div>
           <span id="filterCount" style="color:#64748b;font-size:0.85rem;white-space:nowrap;"></span>
         </div>
         <div class="table-wrap">
@@ -717,6 +722,18 @@
       if (statusFilter !== '') {
         const isPublished = statusFilter === '1';
         filtered = filtered.filter(p => p.published === isPublished);
+      }
+
+      // Filtro por período (data)
+      const dateStart = document.getElementById('filterDateStart')?.value;
+      const dateEnd = document.getElementById('filterDateEnd')?.value;
+      if (dateStart) {
+        const start = new Date(dateStart + 'T00:00:00');
+        filtered = filtered.filter(p => new Date(p.created_at) >= start);
+      }
+      if (dateEnd) {
+        const end = new Date(dateEnd + 'T23:59:59');
+        filtered = filtered.filter(p => new Date(p.created_at) <= end);
       }
 
       // Atualizar contador
