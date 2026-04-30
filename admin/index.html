@@ -353,6 +353,15 @@
   <script>
     const API = '/api';
     const API_SUFFIX = '.php';
+    
+    function apiURL(path) {
+      // Use .php suffix for IIS compatibility
+      const base = path.split('?')[0];
+      const query = path.includes('?') ? '&' + path.split('?')[1] : '';
+      // If path already has extension, don't add suffix
+      if (base.match(/\.(php|html)$/)) return API + base + query;
+      return API + base + API_SUFFIX + query;
+    }
     let token = null;
     let currentUser = null;
     let currentPostId = null;
@@ -365,7 +374,7 @@
       const errorEl = document.getElementById('loginError');
 
       try {
-        const res = await fetch(API + '/auth/login', {
+        const res = await fetch(apiURL('/auth/login'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, password }),
@@ -383,7 +392,7 @@
     });
 
     document.getElementById('logoutBtn').addEventListener('click', async () => {
-      await fetch(API + '/auth/logout', { method: 'POST', credentials: 'include' });
+      await fetch(apiURL('/auth/logout', { method: 'POST', credentials: 'include' });
       token = null;
       currentUser = null;
       hideDashboard();
@@ -466,7 +475,7 @@
           credentials: 'include'
         });
         // A rota :slug pode não achar por ID, então usar a lista
-        const listRes = await fetch(API + '/posts', {
+        const listRes = await fetch(apiURL('/posts', {
           headers: { 'Authorization': 'Bearer ' + token },
           credentials: 'include'
         });
@@ -664,7 +673,7 @@
       }
 
       try {
-        const res = await fetch(API + '/auth/password', {
+        const res = await fetch(apiURL('/auth/password', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
           body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
@@ -704,7 +713,7 @@
       const tbody = document.getElementById('postsTableBody');
       tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;">Carregando...</td></tr>';
       try {
-        const res = await fetch(API + '/posts', {
+        const res = await fetch(apiURL('/posts', {
           headers: token ? { 'Authorization': 'Bearer ' + token } : {},
           credentials: 'include'
         });
@@ -894,7 +903,7 @@
     // Verificar sessão ao carregar a página
     (async () => {
       try {
-        const res = await fetch(API + '/auth/me', { credentials: 'include' });
+        const res = await fetch(apiURL('/auth/me', { credentials: 'include' });
         if (res.ok) {
           const data = await res.json();
           currentUser = data.user;
