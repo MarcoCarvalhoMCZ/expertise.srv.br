@@ -7,6 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -53,6 +54,19 @@
     .btn-block { width: 100%; }
     .error-msg { background: #fef2f2; color: #dc2626; padding: 10px 14px; border-radius: 8px; margin-bottom: 16px; font-size: 0.85rem; display: none; }
     .success-msg { background: #f0fdf4; color: #16a34a; padding: 10px 14px; border-radius: 8px; margin-bottom: 16px; font-size: 0.85rem; display: none; }
+    .password-wrapper { position: relative; }
+    .password-wrapper input { padding-right: 44px; }
+    .password-toggle {
+      position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; cursor: pointer; color: #94a3b8; font-size: 1.1rem;
+      padding: 4px; line-height: 1; transition: color 0.2s;
+    }
+    .password-toggle:hover { color: #334155; }
+    .remember-row {
+      display: flex; align-items: center; gap: 8px; margin-bottom: 16px;
+      font-size: 0.85rem; color: #475569; cursor: pointer;
+    }
+    .remember-row input[type="checkbox"] { width: 16px; height: 16px; accent-color: #2563eb; cursor: pointer; }
 
     /* Dashboard */
     .dashboard { display: none; }
@@ -151,6 +165,26 @@
       .main-content { margin-left: 0; padding: 16px; }
       .sidebar-logo { padding: 0; border: none; }
     }
+    /* Rich text editor */
+    .ql-toolbar.ql-snow { border-radius: 8px 8px 0 0 !important; border-color: #e2e8f0 !important; }
+    .ql-container.ql-snow { border-radius: 0 0 8px 8px !important; border-color: #e2e8f0 !important; font-family: inherit; font-size: 0.95rem; }
+    .ql-editor { min-height: 240px; }
+    /* Thumbnail picker */
+    .thumbnail-picker { border: 1.5px solid #e2e8f0; border-radius: 8px; padding: 12px; background: #f8fafc; }
+    .thumbnail-picker-inner { display: flex; gap: 12px; align-items: flex-start; }
+    .thumbnail-preview-wrap {
+      width: 120px; min-width: 120px; height: 80px; border-radius: 6px; overflow: hidden;
+      border: 1px solid #e2e8f0; background: #e2e8f0; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .thumbnail-preview-wrap img { width: 100%; height: 100%; object-fit: cover; display: none; }
+    #thumbnailEmpty { font-size: 0.75rem; color: #94a3b8; text-align: center; padding: 4px; }
+    .thumbnail-picker-controls { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+    .thumbnail-picker-controls input[type="text"] {
+      width: 100%; padding: 8px 12px; border: 1.5px solid #e2e8f0; border-radius: 8px;
+      font-family: inherit; font-size: 0.9rem; background: #fff;
+    }
+    .thumbnail-picker-controls input[type="text"]:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+    .thumbnail-actions { display: flex; gap: 8px; flex-wrap: wrap; }
   </style>
 </head>
 <body>
@@ -168,8 +202,15 @@
         </div>
         <div class="form-group">
           <label for="password">Senha</label>
-          <input type="password" id="password" required autocomplete="current-password" />
+          <div class="password-wrapper">
+            <input type="password" id="password" required autocomplete="current-password" />
+            <button type="button" class="password-toggle" id="togglePassword" aria-label="Mostrar/ocultar senha" title="Mostrar senha">👁</button>
+          </div>
         </div>
+        <label class="remember-row">
+          <input type="checkbox" id="rememberMe" />
+          Manter conectado
+        </label>
         <button type="submit" class="btn btn-primary btn-block">Entrar</button>
       </form>
     </div>
@@ -292,12 +333,27 @@
             </select>
           </div>
           <div class="form-group">
-            <label for="postContent">Conteúdo (HTML permitido)</label>
-            <textarea id="postContent" rows="12" placeholder="Escreva o conteúdo do post..."></textarea>
+            <label>Conteúdo</label>
+            <div id="postContentEditor"></div>
           </div>
           <div class="form-group">
-            <label for="postThumbnail">URL da Thumbnail</label>
-            <input type="text" id="postThumbnail" placeholder="https://..." />
+            <label>Thumbnail</label>
+            <div class="thumbnail-picker">
+              <div class="thumbnail-picker-inner">
+                <div class="thumbnail-preview-wrap">
+                  <img id="thumbnailPreview" src="" alt="Thumbnail" />
+                  <span id="thumbnailEmpty">Sem imagem</span>
+                </div>
+                <div class="thumbnail-picker-controls">
+                  <input type="text" id="postThumbnail" placeholder="Cole a URL da imagem..." />
+                  <div class="thumbnail-actions">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="triggerThumbnailUpload()">⬆ Upload</button>
+                    <button type="button" class="btn btn-secondary btn-sm" id="useFirstMediaBtn" onclick="useFirstMedia()" style="display:none;">🖼 Usar 1ª mídia</button>
+                  </div>
+                </div>
+              </div>
+              <input type="file" id="thumbnailFileInput" accept="image/*" style="display:none;" />
+            </div>
           </div>
           <div style="display:flex;gap:16px;margin-bottom:16px;">
             <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
@@ -350,6 +406,7 @@
   <!-- Toast -->
   <div class="toast" id="toast"></div>
 
+  <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
   <script>
     const API = '/api';
     const API_SUFFIX = '.php';
@@ -369,12 +426,103 @@
     let token = null;
     let currentUser = null;
     let currentPostId = null;
+    let quill = null;
+
+    // Initialize rich text editor
+    quill = new Quill('#postContentEditor', {
+      theme: 'snow',
+      modules: {
+        toolbar: [
+          [{ header: [1, 2, 3, false] }],
+          ['bold', 'italic', 'underline', 'strike'],
+          ['blockquote'],
+          [{ list: 'ordered' }, { list: 'bullet' }],
+          [{ align: [] }],
+          ['link'],
+          ['clean']
+        ]
+      },
+      placeholder: 'Escreva o conteúdo do post...'
+    });
+
+    // ==================== Thumbnail Picker ====================
+    document.getElementById('postThumbnail').addEventListener('input', updateThumbnailPreview);
+
+    document.getElementById('thumbnailFileInput').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const formData = new FormData();
+      formData.append('thumbnail', file);
+      try {
+        const res = await fetch(apiURL('/posts?action=upload-thumbnail'), {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + token },
+          body: formData,
+          credentials: 'include'
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Erro no upload.');
+        document.getElementById('postThumbnail').value = data.url;
+        updateThumbnailPreview();
+        showToast('Thumbnail enviada!', 'success');
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+      e.target.value = '';
+    });
+
+    function updateThumbnailPreview() {
+      const url = document.getElementById('postThumbnail').value.trim();
+      const img = document.getElementById('thumbnailPreview');
+      const empty = document.getElementById('thumbnailEmpty');
+      if (url) {
+        img.src = url;
+        img.style.display = 'block';
+        empty.style.display = 'none';
+      } else {
+        img.style.display = 'none';
+        img.src = '';
+        empty.style.display = 'block';
+      }
+    }
+
+    function triggerThumbnailUpload() {
+      document.getElementById('thumbnailFileInput').click();
+    }
+
+    function useFirstMedia() {
+      const firstImg = document.querySelector('#mediaGrid .media-item img');
+      if (firstImg) {
+        const url = firstImg.dataset.url || firstImg.getAttribute('src');
+        document.getElementById('postThumbnail').value = url;
+        updateThumbnailPreview();
+        showToast('Primeira imagem definida como thumbnail.', 'success');
+      } else {
+        showToast('Nenhuma imagem disponível nas mídias.', 'error');
+      }
+    }
 
     // ==================== Auth ====================
+    // Toggle mostrar/ocultar senha
+    document.getElementById('togglePassword').addEventListener('click', () => {
+      const input = document.getElementById('password');
+      const btn = document.getElementById('togglePassword');
+      if (input.type === 'password') {
+        input.type = 'text';
+        btn.title = 'Ocultar senha';
+        btn.textContent = '🙈';
+      } else {
+        input.type = 'password';
+        btn.title = 'Mostrar senha';
+        btn.textContent = '👁';
+      }
+    });
+
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const username = document.getElementById('username').value;
       const password = document.getElementById('password').value;
+      const remember = document.getElementById('rememberMe').checked;
       const errorEl = document.getElementById('loginError');
 
       try {
@@ -388,6 +536,13 @@
         if (!res.ok) throw new Error(data.error || 'Erro no login.');
         token = data.token;
         currentUser = data.user;
+        if (remember) {
+          localStorage.setItem('ec_token', token);
+          localStorage.setItem('ec_user', JSON.stringify(currentUser));
+        } else {
+          localStorage.removeItem('ec_token');
+          localStorage.removeItem('ec_user');
+        }
         showDashboard();
       } catch (err) {
         errorEl.textContent = err.message;
@@ -399,7 +554,9 @@
       await fetch(apiURL('/auth/logout'), { method: 'POST', credentials: 'include' });
       token = null;
       currentUser = null;
-      hideDashboard();
+      localStorage.removeItem('ec_token');
+      localStorage.removeItem('ec_user');
+      window.location.href = '/';
     });
 
     function showDashboard() {
@@ -463,8 +620,10 @@
       document.getElementById('postTitle').value = '';
       document.getElementById('postExcerpt').value = '';
       document.getElementById('postType').value = 'text';
-      document.getElementById('postContent').value = '';
+      if (quill) quill.setContents([]);
       document.getElementById('postThumbnail').value = '';
+      updateThumbnailPreview();
+      document.getElementById('useFirstMediaBtn').style.display = 'none';
       document.getElementById('postPublished').checked = false;
       document.getElementById('postFeatured').checked = false;
       document.getElementById('mediaGrid').innerHTML = '';
@@ -487,8 +646,9 @@
         document.getElementById('postTitle').value = post.title;
         document.getElementById('postExcerpt').value = post.excerpt || '';
         document.getElementById('postType').value = post.post_type;
-        document.getElementById('postContent').value = post.content || '';
+        if (quill) quill.clipboard.dangerouslyPasteHTML(post.content || '');
         document.getElementById('postThumbnail').value = post.thumbnail_url || '';
+        updateThumbnailPreview();
         document.getElementById('postPublished').checked = post.published;
         document.getElementById('postFeatured').checked = post.featured;
         document.getElementById('mediaSection').style.display = 'block';
@@ -526,7 +686,7 @@
       const id = document.getElementById('postId').value;
       const payload = {
         title: document.getElementById('postTitle').value,
-        content: document.getElementById('postContent').value,
+        content: quill ? quill.root.innerHTML : '',
         post_type: document.getElementById('postType').value,
         excerpt: document.getElementById('postExcerpt').value,
         published: document.getElementById('postPublished').checked,
@@ -624,12 +784,13 @@
       const grid = document.getElementById('mediaGrid');
       if (!media || media.length === 0) {
         grid.innerHTML = '<p style="color:#94a3b8;font-size:0.85rem;">Nenhuma mídia associada.</p>';
+        document.getElementById('useFirstMediaBtn').style.display = 'none';
         return;
       }
       grid.innerHTML = media.map(m => {
         let preview = '';
         if (m.media_type === 'image') {
-          preview = `<img src="${m.file_url}" alt="${m.file_name}" />`;
+          preview = `<img src="${m.file_url}" data-url="${m.file_url}" alt="${m.file_name}" />`;
         } else if (m.media_type === 'video') {
           preview = `<video src="${m.file_url}" controls></video>`;
         } else if (m.media_type === 'audio') {
@@ -642,6 +803,8 @@
             <button class="media-remove" onclick="removeMedia(${m.id})" title="Remover">×</button>
           </div>`;
       }).join('');
+      const hasImages = media.some(m => m.media_type === 'image');
+      document.getElementById('useFirstMediaBtn').style.display = hasImages ? '' : 'none';
     }
 
     async function removeMedia(mediaId) {
@@ -921,14 +1084,33 @@
 
     // Verificar sessão ao carregar a página
     (async () => {
+      // Tenta restaurar sessão do localStorage (manter conectado)
+      const savedToken = localStorage.getItem('ec_token');
+      const savedUser = localStorage.getItem('ec_user');
+      if (savedToken && savedUser) {
+        try {
+          const res = await fetch(apiURL('/auth/me'), {
+            credentials: 'include',
+            headers: { 'Authorization': 'Bearer ' + savedToken }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            token = savedToken;
+            currentUser = data.user;
+            showDashboard();
+            return;
+          }
+        } catch (_) {}
+        // Token inválido — limpa localStorage
+        localStorage.removeItem('ec_token');
+        localStorage.removeItem('ec_user');
+      }
+      // Tenta via cookie de sessão
       try {
         const res = await fetch(apiURL('/auth/me'), { credentials: 'include' });
         if (res.ok) {
           const data = await res.json();
           currentUser = data.user;
-          // O token JWT está no cookie, precisamos dele no header também para uploads
-          // Vamos fazer login novamente com credenciais padrão OU tentar extrair
-          // Simplificação: usar cookie para autenticação
           showDashboard();
         }
       } catch (_) {

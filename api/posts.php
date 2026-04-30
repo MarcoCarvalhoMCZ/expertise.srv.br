@@ -59,6 +59,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action']) && $_GET['ac
     require_once __DIR__ . '/handlers/posts_media_upload.php';
     exit;
 }
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action']) && $_GET['action'] === 'upload-thumbnail') {
+    $user = requireAuth();
+    if (empty($_FILES['thumbnail']) || $_FILES['thumbnail']['error'] !== UPLOAD_ERR_OK) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Nenhum arquivo enviado.']);
+        exit;
+    }
+    $file = $_FILES['thumbnail'];
+    if (strpos($file['type'], 'image/') !== 0) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Apenas imagens são permitidas como thumbnail.']);
+        exit;
+    }
+    $uploadsDir = __DIR__ . '/uploads/images';
+    if (!is_dir($uploadsDir)) mkdir($uploadsDir, 0755, true);
+    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+    $uniqueName = 'thumb-' . time() . '-' . mt_rand(10000, 99999) . '.' . $ext;
+    $filePath = $uploadsDir . '/' . $uniqueName;
+    if (!move_uploaded_file($file['tmp_name'], $filePath)) {
+        http_response_code(500);
+        echo json_encode(['error' => 'Erro ao salvar arquivo.']);
+        exit;
+    }
+    echo json_encode(['url' => '/api/uploads/images/' . $uniqueName]);
+    exit;
+}
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_once __DIR__ . '/handlers/posts_create.php';
     exit;
