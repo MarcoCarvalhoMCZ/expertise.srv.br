@@ -6,3 +6,4 @@ api/uploads/*
 api/.env
 *.log
 .DS_Store
+deploy-ftp.txt
