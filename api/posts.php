@@ -85,12 +85,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action']) && $_GET['ac
     echo json_encode(['url' => '/api/uploads/images/' . $uniqueName]);
     exit;
 }
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+// Method override: IIS/WebDAV blocks PUT/DELETE; client sends POST with ?_method=PUT|DELETE
+$_method = strtoupper($_GET['_method'] ?? $_SERVER['HTTP_X_HTTP_METHOD_OVERRIDE'] ?? $_SERVER['REQUEST_METHOD']);
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_method === 'POST') {
     require_once __DIR__ . '/handlers/posts_create.php';
     exit;
 }
-// Method override: IIS/WebDAV blocks PUT/DELETE; client sends POST with ?_method=PUT|DELETE
-$_method = strtoupper($_GET['_method'] ?? $_SERVER['HTTP_X_HTTP_METHOD_OVERRIDE'] ?? $_SERVER['REQUEST_METHOD']);
 if ($_method === 'PUT') {
     $_REQUEST['id'] = (int)($_GET['id'] ?? 0);
     require_once __DIR__ . '/handlers/posts_update.php';
