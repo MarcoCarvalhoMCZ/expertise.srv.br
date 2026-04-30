@@ -632,13 +632,12 @@
     // ==================== Posts CRUD ====================
     async function loadPostForEdit(id) {
       try {
-        // Buscar todos (incluindo não publicados) para edição - usa query param compatível com IIS sem rewrite
-        const listRes = await fetch(apiURL('/posts'), {
+        const res = await fetch(apiURL('/posts?id=' + id), {
           headers: { 'Authorization': 'Bearer ' + token },
           credentials: 'include'
         });
-        const listData = await listRes.json();
-        const post = listData.posts.find(p => p.id === id);
+        const data = await res.json();
+        const post = data.post;
         if (!post) { showToast('Post não encontrado.', 'error'); return; }
 
         currentPostId = post.id;
