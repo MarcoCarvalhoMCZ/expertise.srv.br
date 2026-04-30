@@ -31,7 +31,8 @@ if (strpos($path, $basePath) === 0) {
 $path = preg_replace('/\.php$/', '', $path);
 
 $path = '/' . trim($path, '/');
-$method = $_SERVER['REQUEST_METHOD'];
+// Method override: IIS/WebDAV blocks PUT/DELETE; client sends POST with ?_method=PUT|DELETE
+$method = strtoupper($_GET['_method'] ?? $_SERVER['HTTP_X_HTTP_METHOD_OVERRIDE'] ?? $_SERVER['REQUEST_METHOD']);
 
 // === ROTAS DE AUTENTICAÇÃO ===
 if ($path === '/auth/login' && $method === 'POST') {

@@ -695,9 +695,9 @@
       };
 
       const isEdit = !!id;
-      // Use query params for IIS (no URL rewrite)
-      const path = isEdit ? '/posts?id=' + id : '/posts';
-      const method = isEdit ? 'PUT' : 'POST';
+      // Use POST + _method override (IIS/WebDAV blocks PUT/DELETE directly)
+      const path = isEdit ? '/posts?id=' + id + '&_method=PUT' : '/posts';
+      const method = 'POST';
 
       try {
         const res = await apiAction(path, method, payload);
@@ -726,7 +726,7 @@
     async function deletePost(id) {
       if (!confirm('Tem certeza que deseja excluir este post? Esta ação não pode ser desfeita.')) return;
       try {
-        const res = await apiAction('/posts?id=' + id, 'DELETE');
+        const res = await apiAction('/posts?id=' + id + '&_method=DELETE', 'POST');
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
         showToast('Post excluído com sucesso!', 'success');
@@ -810,8 +810,8 @@
     async function removeMedia(mediaId) {
       if (!confirm('Remover esta mídia?')) return;
       try {
-        const res = await fetch(apiURL('/posts?action=delete-media&id=' + currentPostId + '&media_id=' + mediaId), {
-          method: 'DELETE',
+        const res = await fetch(apiURL('/posts?action=delete-media&id=' + currentPostId + '&media_id=' + mediaId + '&_method=DELETE'), {
+          method: 'POST',
           headers: { 'Authorization': 'Bearer ' + token },
           credentials: 'include'
         });
@@ -849,8 +849,8 @@
       }
 
       try {
-        const res = await fetch(apiURL('/auth/password'), {
-          method: 'PUT',
+        const res = await fetch(apiURL('/auth/password') + '?_method=PUT', {
+          method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
           body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
           credentials: 'include'
