@@ -18,7 +18,7 @@ async function loadBlogPosts() {
   if (!grid) return;
 
   try {
-    const res = await fetch('/api/posts');
+    const res = await fetch('/api/posts.php');
     if (!res.ok) throw new Error('Erro ao carregar posts');
     const data = await res.json();
     const posts = data.posts || [];

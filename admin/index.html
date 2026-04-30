@@ -355,12 +355,16 @@
     const API_SUFFIX = '.php';
     
     function apiURL(path) {
-      // Use .php suffix for IIS compatibility
-      const base = path.split('?')[0];
-      const query = path.includes('?') ? '&' + path.split('?')[1] : '';
-      // If path already has extension, don't add suffix
-      if (base.match(/\.(php|html)$/)) return API + base + query;
-      return API + base + API_SUFFIX + query;
+      // Extract query string
+      const q = path.indexOf('?');
+      const base = q >= 0 ? path.substring(0, q) : path;
+      const query = q >= 0 ? path.substring(q) : '';
+      // Auth paths use .php files directly
+      if (base.startsWith('/auth/')) return API + base + '.php' + query;
+      // Posts uses unified router
+      if (base === '/posts') return API + '/posts.php' + query;
+      // Fallback
+      return API + base + query;
     }
     let token = null;
     let currentUser = null;
@@ -469,12 +473,7 @@
     // ==================== Posts CRUD ====================
     async function loadPostForEdit(id) {
       try {
-        // Buscar todos (incluindo não publicados) para edição
-        const res = await fetch(API + '/posts/' + id, {
-          headers: { 'Authorization': 'Bearer ' + token },
-          credentials: 'include'
-        });
-        // A rota :slug pode não achar por ID, então usar a lista
+        // Buscar todos (incluindo não publicados) para edição - usa query param compatível com IIS sem rewrite
         const listRes = await fetch(apiURL('/posts'), {
           headers: { 'Authorization': 'Bearer ' + token },
           credentials: 'include'
@@ -500,6 +499,28 @@
       }
     }
 
+    function apiAction(path, method, body, auth) {
+      // Use query params for IIS compatibility (no URL Rewrite)
+      let url = apiURL(path);
+      const options = {
+        method,
+        credentials: 'include',
+        headers: {}
+      };
+      if (auth !== false && token) {
+        options.headers['Authorization'] = 'Bearer ' + token;
+      }
+      if (body) {
+        if (body instanceof FormData) {
+          options.body = body;
+        } else {
+          options.headers['Content-Type'] = 'application/json';
+          options.body = JSON.stringify(body);
+        }
+      }
+      return fetch(url, options);
+    }
+
     document.getElementById('postForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const id = document.getElementById('postId').value;
@@ -514,16 +535,12 @@
       };
 
       const isEdit = !!id;
-      const url = isEdit ? API + '/posts/' + id : API + '/posts';
+      // Use query params for IIS (no URL rewrite)
+      const path = isEdit ? '/posts?id=' + id : '/posts';
       const method = isEdit ? 'PUT' : 'POST';
 
       try {
-        const res = await fetch(url, {
-          method,
-          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-          body: JSON.stringify(payload),
-          credentials: 'include'
-        });
+        const res = await apiAction(path, method, payload);
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Erro ao salvar post.');
 
@@ -535,7 +552,6 @@
         }
 
         showToast(data.message, 'success');
-        // Navegar para a lista de posts mantendo os filtros
         showPostsList();
         loadPosts();
       } catch (err) {
@@ -550,11 +566,7 @@
     async function deletePost(id) {
       if (!confirm('Tem certeza que deseja excluir este post? Esta ação não pode ser desfeita.')) return;
       try {
-        const res = await fetch(API + '/posts/' + id, {
-          method: 'DELETE',
-          headers: { 'Authorization': 'Bearer ' + token },
-          credentials: 'include'
-        });
+        const res = await apiAction('/posts?id=' + id, 'DELETE');
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
         showToast('Post excluído com sucesso!', 'success');
@@ -590,7 +602,8 @@
         formData.append('files', file);
       }
       try {
-        const res = await fetch(API + '/posts/' + currentPostId + '/media', {
+        // Use query params for IIS compatibility
+        const res = await fetch(apiURL('/posts?action=upload&id=' + currentPostId), {
           method: 'POST',
           headers: { 'Authorization': 'Bearer ' + token },
           body: formData,
@@ -634,7 +647,7 @@
     async function removeMedia(mediaId) {
       if (!confirm('Remover esta mídia?')) return;
       try {
-        const res = await fetch(API + '/posts/' + currentPostId + '/media/' + mediaId, {
+        const res = await fetch(apiURL('/posts?action=delete-media&id=' + currentPostId + '&media_id=' + mediaId), {
           method: 'DELETE',
           headers: { 'Authorization': 'Bearer ' + token },
           credentials: 'include'
