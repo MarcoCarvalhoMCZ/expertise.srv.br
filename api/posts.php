@@ -48,10 +48,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         exit;
     }
     // List all posts
-    $sql = "SELECT id, title, slug, post_type, published, featured, created_at FROM posts ORDER BY created_at DESC";
+    $sql = "SELECT id, title, slug, post_type, thumbnail_url, published, featured, created_at FROM posts ORDER BY created_at DESC";
     $stmt = dbQuery($sql);
     $rows = dbFetchAll($stmt);
-    echo json_encode(['posts' => $rows], JSON_UNESCAPED_UNICODE);
+    $result = [];
+    foreach ($rows as $row) {
+        $mStmt = dbQuery(
+            "SELECT id, media_type, file_url, file_name, file_size, sort_order FROM post_media WHERE post_id = ? ORDER BY sort_order",
+            [$row['id']]
+        );
+        $row['media'] = dbFetchAll($mStmt) ?: [];
+        $result[] = $row;
+    }
+    echo json_encode(['posts' => $result], JSON_UNESCAPED_UNICODE);
     exit;
 }
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action']) && $_GET['action'] === 'upload') {
