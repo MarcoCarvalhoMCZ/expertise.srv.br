@@ -74,22 +74,30 @@
   <script>
     document.getElementById('year').textContent = new Date().getFullYear();
 
-    const slug = window.location.pathname.replace('/post/', '');
-    const apiUrl = '/api/posts/' + encodeURIComponent(slug);
+    const params = new URLSearchParams(window.location.search);
+    const slug = params.get('slug') || '';
+    // Fallback: uses the working posts list endpoint + client-side filter
+    const apiUrl = '/api/posts.php';
 
     async function loadPost() {
       const loadingEl = document.getElementById('postLoading');
       const errorEl = document.getElementById('postError');
       const contentEl = document.getElementById('postContent');
 
+      if (!slug) {
+        loadingEl.style.display = 'none';
+        errorEl.style.display = 'block';
+        errorEl.innerHTML = '<p>Post não especificado.</p><a href="/#blog" class="back-link">← Voltar para o Blog</a>';
+        return;
+      }
+
       try {
         const res = await fetch(apiUrl);
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || 'Post não encontrado.');
-        }
+        if (!res.ok) throw new Error('Erro ao carregar posts');
         const data = await res.json();
-        const post = data.post;
+        const posts = data.posts || [];
+        const post = posts.find(p => p.slug === slug);
+        if (!post) throw new Error('Post não encontrado.');
 
         document.title = post.title + ' | Expertise Contábil';
 

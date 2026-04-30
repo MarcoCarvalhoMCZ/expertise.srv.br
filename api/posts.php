@@ -14,6 +14,40 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/jwt.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    // Single post by slug or id
+    if (isset($_GET['slug']) || isset($_GET['id'])) {
+        $where = isset($_GET['slug']) ? 'p.slug = ?' : 'p.id = ?';
+        $param = isset($_GET['slug']) ? $_GET['slug'] : (int)$_GET['id'];
+        
+        // Fetch post data
+        $stmt = dbQuery(
+            "SELECT p.*, u.display_name AS author_name FROM posts p LEFT JOIN users u ON p.author_id = u.id WHERE $where",
+            [$param]
+        );
+        $rows = dbFetchAll($stmt);
+        if (empty($rows)) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Post não encontrado.']);
+            exit;
+        }
+        $post = $rows[0];
+        $post['published'] = (bool)$post['published'];
+        $post['featured'] = (bool)$post['featured'];
+        
+        // Fetch media (ODBC requires separate connection to avoid cursor issues)
+        // Use dbQuery which reuses the connection - but fetch results immediately
+        // Since we already fetched all rows above, we can safely run another query
+        $mStmt = dbQuery(
+            "SELECT id, media_type, file_url, file_name, file_size, sort_order FROM post_media WHERE post_id = ? ORDER BY sort_order",
+            [$post['id']]
+        );
+        $media = dbFetchAll($mStmt);
+        $post['media'] = $media ?: [];
+        
+        echo json_encode(['post' => $post], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    // List all posts
     $sql = "SELECT id, title, slug, post_type, published, featured, created_at FROM posts ORDER BY created_at DESC";
     $stmt = dbQuery($sql);
     $rows = dbFetchAll($stmt);

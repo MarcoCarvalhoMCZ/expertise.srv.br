@@ -44,7 +44,7 @@ async function loadBlogPosts() {
         <article class="card blog-card">
           ${thumbUrl ? `<div class="blog-thumb"><img src="${thumbUrl}" alt="${escapeHtml(post.title)}" loading="lazy" /></div>` : ''}
           <span class="icon">${typeIcon[post.post_type] || '📄'}</span>
-          <h3><a href="/post/${post.slug}" style="color:inherit;text-decoration:none;">${escapeHtml(post.title)}</a></h3>
+          <h3><a href="/post.html?slug=${post.slug}" style="color:inherit;text-decoration:none;">${escapeHtml(post.title)}</a></h3>
           <p>${escapeHtml(excerpt)}</p>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;">
             <small style="color:#94a3b8;">${date}</small>
