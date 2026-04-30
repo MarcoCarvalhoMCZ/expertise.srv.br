@@ -10,6 +10,16 @@ const postRoutes = require('./routes/posts');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Strip .php extension for IIS compatibility (admin panel adds .php to paths)
+app.use((req, res, next) => {
+  if (req.path.endsWith('.php') && req.path.startsWith('/api/')) {
+    const queryIndex = req.originalUrl.indexOf('?');
+    const query = queryIndex >= 0 ? req.originalUrl.slice(queryIndex) : '';
+    req.url = req.path.replace('.php', '') + query;
+  }
+  next();
+});
+
 // Middleware globais
 app.use(cors({
   origin: true,

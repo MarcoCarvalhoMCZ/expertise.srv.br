@@ -27,6 +27,9 @@ if (strpos($path, $basePath) === 0) {
     $path = substr($path, strlen($basePath));
 }
 
+// Remove .php extension if present (admin panel adds it for IIS compatibility)
+$path = preg_replace('/\.php$/', '', $path);
+
 $path = '/' . trim($path, '/');
 $method = $_SERVER['REQUEST_METHOD'];
 

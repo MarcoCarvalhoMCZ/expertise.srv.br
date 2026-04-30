@@ -392,7 +392,7 @@
     });
 
     document.getElementById('logoutBtn').addEventListener('click', async () => {
-      await fetch(apiURL('/auth/logout', { method: 'POST', credentials: 'include' });
+      await fetch(apiURL('/auth/logout'), { method: 'POST', credentials: 'include' });
       token = null;
       currentUser = null;
       hideDashboard();
@@ -475,7 +475,7 @@
           credentials: 'include'
         });
         // A rota :slug pode não achar por ID, então usar a lista
-        const listRes = await fetch(apiURL('/posts', {
+        const listRes = await fetch(apiURL('/posts'), {
           headers: { 'Authorization': 'Bearer ' + token },
           credentials: 'include'
         });
@@ -673,7 +673,7 @@
       }
 
       try {
-        const res = await fetch(apiURL('/auth/password', {
+        const res = await fetch(apiURL('/auth/password'), {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
           body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
@@ -713,7 +713,7 @@
       const tbody = document.getElementById('postsTableBody');
       tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;">Carregando...</td></tr>';
       try {
-        const res = await fetch(apiURL('/posts', {
+        const res = await fetch(apiURL('/posts'), {
           headers: token ? { 'Authorization': 'Bearer ' + token } : {},
           credentials: 'include'
         });
@@ -889,6 +889,12 @@
       setTimeout(() => { toast.classList.remove('show'); }, 3500);
     }
 
+    function stripHtml(html) {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = html;
+      return tmp.textContent || tmp.innerText || '';
+    }
+
     function escapeHtml(text) {
       const map = { '&': '&', '<': '<', '>': '>', '"': '"', "'": '&#039;' };
       return String(text).replace(/[&<>"']/g, m => map[m]);
@@ -903,7 +909,7 @@
     // Verificar sessão ao carregar a página
     (async () => {
       try {
-        const res = await fetch(apiURL('/auth/me', { credentials: 'include' });
+        const res = await fetch(apiURL('/auth/me'), { credentials: 'include' });
         if (res.ok) {
           const data = await res.json();
           currentUser = data.user;
